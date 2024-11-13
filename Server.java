@@ -1,133 +1,102 @@
-/*import java.util.*;
-public class Server{
-    int num;
-    public Server(int num){
-        this.num = num;
-    }
-    public void serve(int num){
-
-    }
-    public void disconnect(){
-
-    }
-    public ArrayList getLocalTimes(){
-
-    }
-}*/
 import java.io.*;
 import java.net.*;
 import java.time.LocalDateTime;
 import java.util.*;
 
 public class Server {
-    private int port;              // Port to listen on
-    private ServerSocket serverSocket;  // Server socket for accepting connections
-    private List<Socket> clientSockets; // List to track connected clients
-    private List<LocalDateTime> connectedTimes; // To track when clients connect
-
-    public Server(int port) {
+    private int port; //create varaibles 
+    private ServerSocket serverSocket;
+    private ArrayList<Socket> clientSockets;
+    private ArrayList<LocalDateTime> connectedTimes;
+    
+    public Server(int port){ //server constructor and initialization of varaibles for every instance
         this.port = port;
-        clientSockets = new ArrayList<>();
-        connectedTimes = new ArrayList<>();
-        try {
-            serverSocket = new ServerSocket(port); // Open server socket on the specified port
-            System.out.println("Server started on port " + port);
-        } catch (IOException e) {
-            System.err.println("Error starting server: " + e.getMessage());
+        clientSockets = new ArrayList<Socket>();
+        connectedTimes = new ArrayList<LocalDateTime>();
+        try{
+            serverSocket = new ServerSocket(port); //tries to create new server socket for connections
+        }catch(IOException e){ //exception
+            System.out.println(e);
         }
     }
-
-    // Method to serve a single client or multiple clients
-    public void serve(int numClients) {
-        try {
-            for (int i = 0; i < numClients; i++) {
-                Socket clientSocket = serverSocket.accept(); // Wait for a client to connect
-                clientSockets.add(clientSocket); // Add the client socket to the list
-
-                // Record the time when this client connected
-                connectedTimes.add(LocalDateTime.now());
-
-                // Start a new thread to handle this client
-                new Thread(new ClientHandler(clientSocket)).start();
-            }
-        } catch (IOException e) {
-            System.err.println("Error while accepting client connection: " + e.getMessage());
-        }
-    }
-
-    // Clean up the server and disconnect all clients
-    public void disconnect() {
-        try {
-            for (Socket clientSocket : clientSockets) {
-                clientSocket.close(); // Close all client sockets
-            }
-            serverSocket.close(); // Close the server socket
-            System.out.println("Server disconnected.");
-        } catch (IOException e) {
-            System.err.println("Error during disconnection: " + e.getMessage());
-        }
-    }
-
-    // Method to retrieve the times when clients connected (for test purposes)
-    public List<LocalDateTime> getConnectedTimes() {
-        return connectedTimes;
-    }
-
-    // A private inner class to handle communication with clients in a separate thread
-    private class ClientHandler implements Runnable {
+    
+    private class ClientHandler extends Thread{ //client handler used in serve
         private Socket clientSocket;
-
-        public ClientHandler(Socket socket) {
+    
+        public ClientHandler(Socket socket){ //constructor
             this.clientSocket = socket;
         }
-
-        @Override
-        public void run() {
+        
+        public void run(){
             try {
-                // Set up input/output streams for client communication
-                BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
-
-                // Read the request from the client (e.g., number to process)
-                String input = in.readLine();
-                System.out.println("Received from client: " + input);
-
-                // Example: Process the client's request (e.g., finding the number of factors)
-                String response = processRequest(input);
+                BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); //set up new input stream
+                PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true); //setup new output streat
+                String handshake = in.readLine(); //read message
+                if ("12345".equals(handshake) != true){ //check if code is correct if not
+                    out.println("couldn't handshake"); //fail
+                    clientSocket.close(); //close
+                    return;
+                }
+                String request = null; 
+                while ((request = in.readLine()) != null) { //as long as the request isnt null
+                    String response = processRequest(request); //call on processRequest
+                    out.println(response); //print response
+                }
                 
-                // Send the response back to the client
-                out.println(response);
-            } catch (IOException e) {
-                System.err.println("Error while communicating with client: " + e.getMessage());
-            } finally {
-                try {
-                    clientSocket.close();  // Close the connection to the client
-                } catch (IOException e) {
-                    System.err.println("Error closing client socket: " + e.getMessage());
-                }
+            }catch(IOException e){ //error handling
+                System.out.println(e);
             }
         }
-
-        // Helper method to process a client's request (e.g., calculating factors)
-        private String processRequest(String num) {
-            try {
-                int n = Integer.parseInt(num);
-                int factorCount = countFactors(n);
-                return "The number " + num + " has " + factorCount + " factors";
-            } catch (NumberFormatException e) {
-                return "There was an exception on the server";
+    }
+    
+    public void serve(int numClients){ //accepting a specific number of clients
+        try {
+            for (int i = 0; i < numClients; i++){  
+                Socket clientSocket = serverSocket.accept(); //accept connection
+                clientSockets.add(clientSocket); //add to list of connections
+                connectedTimes.add(LocalDateTime.now()); //add time connected
+                (new ClientHandler(clientSocket)).start();
+            }
+        } catch (IOException e) {
+            System.out.println(e);
+        }
+    }
+    
+    public void disconnect(){ //disconnects all clients
+        try {
+            for (int i = 0; i < clientSockets.size(); i++){ //loop through
+                Socket clientSocket = clientSockets.get(i); //obtain clientSocket
+                clientSocket.close(); //close clientSocket
+            }
+            serverSocket.close(); //close entire server socket
+        }catch(IOException e){
+            System.out.println(e); //error handling
+        }
+    }
+    
+    public ArrayList<LocalDateTime> getConnectedTimes(){ //returns arrayList of connectedTimess
+        return connectedTimes;
+    }
+    
+    public String processRequest(String num){ //processes request
+        Scanner scanner = new Scanner(num); //creates a new scanner
+        if (scanner.hasNextInt() == true){
+            int n = scanner.nextInt(); //add int to n
+            int factorCount = countFactors(n); //find factor
+            String result = "The number " + n + " has " + factorCount + " factors"; //return result
+            return result;
+        }else{
+            return "There was an exception on the server";
+        }
+    }
+    
+    public int countFactors(int num){ //counts the factors of a given number
+        int count = 0;
+        for (int i = 1; i <= num; i++) {
+            if (num % i == 0) {
+                count++;
             }
         }
-
-        // Helper method to count the factors of a number
-        private int countFactors(int num) {
-            int count = 0;
-            for (int i = 1; i <= num; i++) {
-                if (num % i == 0) {
-                    count++;
-                }
-            }
-            return count;
-        }
+        return count;
     }
 }
